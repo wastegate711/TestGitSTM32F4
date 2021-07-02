@@ -1,0 +1,26 @@
+--cpu=Cortex-M4.fp.sp
+"testci\startup_stm32f407xx.o"
+"testci\main.o"
+"testci\gpio.o"
+"testci\stm32f4xx_it.o"
+"testci\stm32f4xx_hal_msp.o"
+"testci\stm32f4xx_hal_tim.o"
+"testci\stm32f4xx_hal_tim_ex.o"
+"testci\stm32f4xx_hal_rcc.o"
+"testci\stm32f4xx_hal_rcc_ex.o"
+"testci\stm32f4xx_hal_flash.o"
+"testci\stm32f4xx_hal_flash_ex.o"
+"testci\stm32f4xx_hal_flash_ramfunc.o"
+"testci\stm32f4xx_hal_gpio.o"
+"testci\stm32f4xx_hal_dma_ex.o"
+"testci\stm32f4xx_hal_dma.o"
+"testci\stm32f4xx_hal_pwr.o"
+"testci\stm32f4xx_hal_pwr_ex.o"
+"testci\stm32f4xx_hal_cortex.o"
+"testci\stm32f4xx_hal.o"
+"testci\stm32f4xx_hal_exti.o"
+"testci\system_stm32f4xx.o"
+--library_type=microlib --strict --scatter "TestCI\TestCI.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "TestCI.map" -o TestCI\TestCI.axf
