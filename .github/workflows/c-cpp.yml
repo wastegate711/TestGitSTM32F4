@@ -1,26 +1,106 @@
-name: CI
+name: Test
 
-on: # rebuild any PRs and main branch changes
+on:
   push:
+  pull_request:
 
 jobs:
-  build: # make sure build/ci work properly
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - run: npm install
-    - run: npm run all
-  
-  test: # make sure the action works on a clean machine without building
+  test:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    name: Test @ ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+        platform: [x86, x64]
+        cygwin: [0, 1]
+        hardlinks: [0, 1]
+        os: [ubuntu-18.04, ubuntu-20.04, ubuntu-latest, windows-2016, windows-2019, windows-latest]
+
+        include:
+          # Prettier run names.
+          - {os: ubuntu-18.04, name: Ubuntu 18.04}
+          - {os: ubuntu-20.04, name: Ubuntu 20.04}
+          - {os: ubuntu-latest, name: Ubuntu (latest)}
+          - {os: windows-2016, name: Windows Server 2016}
+          - {os: windows-2019, name: Windows Server 2019}
+          - {os: windows-latest, name: Windows Server (latest)}
+          - {cygwin: 1, name: Cygwin}
+        exclude:
+          # No Cygwin on Ubuntu.
+          - {os: ubuntu-18.04, cygwin: 1}
+          - {os: ubuntu-20.04, cygwin: 1}
+          - {os: ubuntu-latest, cygwin: 1}
+          # Cygwin is the same on all Windows Server versions.
+          - {os: windows-2016, cygwin: 1}
+          - {os: windows-2019, cygwin: 1}
+          # Only test hardlinks on Cygwin.
+          - {cygwin: 0, hardlinks: 1}
+
+    runs-on: '${{ matrix.os }}'
+
+    name: '${{ matrix.name }} / ${{ matrix.platform }} / Hardlinks: ${{ matrix.hardlinks }}'
+
+    defaults:
+      run:
+        shell: pwsh
+
     steps:
-    - uses: actions/checkout@v2
-    - uses: ./
-      with: 
-        release: 10-2020-q4
-    - run: arm-none-eabi-gcc -v
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Clean up PATH
+        uses: egor-tensin/cleanup-path@v1
+        if: runner.os == 'Windows'
+
+      - name: Install Cygwin
+        uses: egor-tensin/setup-cygwin@v3
+        if: matrix.cygwin
+
+      - name: Set up MinGW
+        id: setup
+        uses: ./
+        with:
+          platform: '${{ matrix.platform }}'
+          cygwin: '${{ matrix.cygwin }}'
+          cc: 1
+          hardlinks: '${{ matrix.hardlinks }}'
+
+      - name: Build foo.exe
+        run: |
+          $flags = '-std=c++14','-o','foo','foo.cpp'
+          & '${{ steps.setup.outputs.gxx }}' $flags
+      - name: Run foo.exe
+        run: |
+          $expected = @"
+          Doing something #1
+          Doing something #2
+          Doing something #3
+          "@
+          $actual = & (Join-Path . foo.exe)
+          $actual = $actual -join [Environment]::NewLine
+          $($actual -eq $expected) -or $(throw @"
+          Unexpected output:
+          $actual
+          "@)
+        if: runner.os == 'Windows'
+
+      # Is this really the most stable piece of `gcc --version` output?
+      - name: Check cc/c++
+        run: |
+          echo (Get-Command cc).Path
+          $cc = & cc --version
+          echo $cc
+          $($cc | Select-String -Pattern "This is free software; see the source for copying conditions." -SimpleMatch -Quiet) -or $(throw "Unexpected `cc --version` output")
+          echo (Get-Command c++).Path
+          $cxx = & c++ --version
+          echo $cxx
+          $($cxx | Select-String -Pattern "This is free software; see the source for copying conditions." -SimpleMatch -Quiet) -or $(throw "Unexpected `c++ --version` output")
+        if: '!matrix.cygwin || matrix.hardlinks'
+
+      - name: Check cc/c++ on Cygwin
+        run: |
+          $cc = bash.exe --login -o errexit -c 'cc --version'
+          echo $cc
+          $($cc | Select-String -Pattern "This is free software; see the source for copying conditions." -SimpleMatch -Quiet) -or $(throw "Unexpected `cc --version` output")
+          $cxx = bash.exe --login -o errexit -c 'c++ --version'
+          echo $cxx
+          $($cxx | Select-String -Pattern "This is free software; see the source for copying conditions." -SimpleMatch -Quiet) -or $(throw "Unexpected `c++ --version` output")
+        if: matrix.cygwin && !matrix.hardlinks
