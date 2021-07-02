@@ -63,11 +63,11 @@ jobs:
           cc: 1
           hardlinks: '${{ matrix.hardlinks }}'
 
-      - name: Build foo.exe
+      - name: Build main.c
         run: |
-          $flags = '-std=c++14','-o','foo','foo.cpp'
+          $flags = '-std=c++14','-o','main','main.c'
           & '${{ steps.setup.outputs.gxx }}' $flags
-      - name: Run foo.exe
+      - name: Run main.c
         run: |
           $expected = @"
           Doing something #1
